@@ -1,0 +1,65 @@
+quarkus:
+  application:
+    name: triage-service
+  http:
+    port: 8080
+  datasource:
+    db-kind: postgresql
+    jdbc:
+      url: ${DB_JDBC_URL:jdbc:postgresql://localhost:5432/triage-db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD}
+  hibernate-orm:
+    jdbc:
+      timezone: UTC
+    database:
+      generation: update
+  flyway:
+    migrate-at-start: true
+  langchain4j:
+    ollama:
+      devservices:
+        enabled: false
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      timeout: 90s
+      chat-model:
+        model-id: ${OLLAMA_MODEL:llama3.2}
+        temperature: 0
+prompt:
+  version: prompts/ClassifyRules_V1.txt
+
+job:
+  classify:
+    everyExpression: 10m
+  mail-fetch:
+    everyExpression: 15m
+    maxResult: 50
+    query: in:inbox
+
+"%env":
+  google:
+    gmail:
+      client-id: ${GOOGLE_GMAIL_CLIENT_ID}
+      client-secret: ${GOOGLE_GMAIL_CLIENT_SECRET}
+      refresh-token: ${GOOGLE_GMAIL_REFRESH_TOKEN}
+  quarkus:
+    vault:
+      devservices:
+        enabled: false
+"%vault":
+  quarkus:
+    datasource:
+      jdbc:
+        url: ${vault.db.jdbc-url}
+      username: ${vault.db.username}
+      password: ${vault.db.password}
+    vault:
+      url: ${VAULT_URL}
+      authentication:
+        client-token: ${VAULT_TOKEN}
+      secret-config-kv-path: email-triage/config
+  google:
+    gmail:
+      client-id: ${vault.gmail.client-id}
+      client-secret: ${vault.gmail.client-secret}
+      refresh-token: ${vault.gmail.refresh-token}
