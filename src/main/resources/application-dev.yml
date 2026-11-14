@@ -1,48 +1,25 @@
 quarkus:
-  application:
-    name: triage-service
-  http:
-    port: 8080
   datasource:
-    db-kind: postgresql
     jdbc:
-      url: ${DB_JDBC_URL:jdbc:postgresql://localhost:5432/triage-db}
+      url: jdbc:postgresql://localhost:5432/triage-db
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD}
-  hibernate-orm:
-    jdbc:
-      timezone: UTC
-    database:
-      generation: update
-  flyway:
-    migrate-at-start: true
   langchain4j:
     ollama:
       devservices:
-        enabled: false
-      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+        enabled: true
+      base-url: http://localhost:11434
       timeout: 90s
       chat-model:
-        model-id: ${OLLAMA_MODEL:llama3.2}
-        temperature: 0
+        model-id: llama3.2
 prompt:
   version: prompts/ClassifyRules_V1.txt
-
-job:
-  classify:
-    everyExpression: 10m
-  mail-fetch:
-    everyExpression: 15m
-    maxResult: 50
-    query: in:inbox
-
 "%env":
   google:
     gmail:
       client-id: ${GOOGLE_GMAIL_CLIENT_ID}
       client-secret: ${GOOGLE_GMAIL_CLIENT_SECRET}
       refresh-token: ${GOOGLE_GMAIL_REFRESH_TOKEN}
-  quarkus:
     vault:
       devservices:
         enabled: false

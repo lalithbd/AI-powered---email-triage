@@ -2,6 +2,7 @@ package org.galactic.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
@@ -18,7 +19,7 @@ import java.time.Instant;
 @Entity(name = "classification")
 public class Classification extends PanacheEntity {
 
-    @Enumerated
+    @Enumerated(EnumType.STRING)
     private Category category;
     private String reason;
     private String draft;

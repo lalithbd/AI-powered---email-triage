@@ -2,6 +2,8 @@ package org.galactic.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import lombok.*;
@@ -17,6 +19,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class Feedback extends PanacheEntity {
 
+    @Enumerated(EnumType.STRING)
     private Category correctedCategory;
     private Instant createdAt;
 
