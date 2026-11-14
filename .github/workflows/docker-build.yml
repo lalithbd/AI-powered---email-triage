@@ -34,7 +34,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PIPELINE_TOKENs }}
+          password: ${{ secrets.PIPELINE_TOKEN }}
 
       - name: Resolve image version
         id: meta
