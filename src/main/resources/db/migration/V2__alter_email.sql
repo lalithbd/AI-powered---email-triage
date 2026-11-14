@@ -1,0 +1,3 @@
+ALTER TABLE email ALTER COLUMN body TYPE text;
+ALTER TABLE email ALTER COLUMN subject TYPE varchar(1024);
+ALTER TABLE email ALTER COLUMN sender TYPE varchar(512);
