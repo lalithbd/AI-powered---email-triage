@@ -23,8 +23,14 @@ public class ClassificationJob {
             return;
         }
         isRunning.set(true);
-        classificationService.classify();
-        isRunning.set(false);
+        try {
+            classificationService.classify();
+        } catch (Exception e){
+            log.error("Error: {}", e.getMessage());
+        } finally {
+            isRunning.set(false);
+        }
+
 
     }
 }
