@@ -2,6 +2,7 @@ package org.galactic.service;
 
 import org.galactic.dto.view.*;
 import org.galactic.model.Classification;
+import org.galactic.model.Email;
 
 import java.util.List;
 

@@ -2,12 +2,11 @@
 //
 // Contract (matches TriageController / EmailDataService):
 //
-//   GET  /triage/today  -> CategoryGroup { "category": ..., "emails": [ <email>, ... ] }
-//   GET  /triage/week   -> CategoryGroup { "category": ..., "emails": [ <email>, ... ] }
-//   GET  /triage/email/{id} -> <email>
-//   POST /triage/email/{id}/feedback
-//        body: { "message": "<category name>" }   (DTO is Feedback(String message);
-//        the selected category is sent in `message` — update if the API gets a typed field)
+//   GET  /triage/today  -> Summary { "statChips": [...], "categoryGroups": [ { "category": ..., "emails": [ <email>, ... ] } ] }
+//   GET  /triage/weekly -> [ CategoryGroup { "category": ..., "emails": [ <email>, ... ] } ]
+//   GET  /email/{id}    -> <email>
+//   POST /feed-back/{id}
+//        body: { "category": "<category name>" }   (DTO is FeedbackCategory(Category category))
 //
 // <email> = TriageEmail record:
 //   { "id": 1, "sender": "...", "subject": "...", "receivedAt": "09:12",
@@ -82,8 +81,13 @@ function emailCard(email) {
     </a>`;
 }
 
-function todayBody(group) {
-    const groups = groupByCategory(group?.emails);
+function flattenEmails(data) {
+    const groups = Array.isArray(data) ? data : (data?.categoryGroups ?? []);
+    return groups.flatMap(g => g?.emails ?? []);
+}
+
+function todayBody(emails) {
+    const groups = groupByCategory(emails);
     if (!groups.length) return `<div class="card empty">No emails triaged yet today.</div>`;
     const stats = groups.map(g => `<div class="stat">
         <div class="n">${g.emails.length}</div>
@@ -95,10 +99,10 @@ function todayBody(group) {
     return `<div class="stats">${stats}</div>${list}`;
 }
 
-function weekBody(group) {
-    const groups = groupByCategory(group?.emails);
+function weekBody(emails) {
+    const groups = groupByCategory(emails);
     if (!groups.length) return `<div class="card empty">No emails triaged this week.</div>`;
-    const total = group.emails.length;
+    const total = emails.length;
     const max = Math.max(...groups.map(g => g.emails.length));
     const bars = groups.map(g => {
         const pct = Math.max(4, Math.round((g.emails.length / max) * 100));
@@ -111,7 +115,7 @@ function weekBody(group) {
     return `<div class="week-total"><span class="n">${total}</span><span class="muted"> emails this week</span></div>
         ${bars}
         <h2 class="group">Emails</h2>
-        ${(group.emails ?? []).map(emailCard).join("")}`;
+        ${(emails ?? []).map(emailCard).join("")}`;
 }
 
 function widgetError(err) {
@@ -130,19 +134,19 @@ async function renderIndex() {
         </section>
     </div>`;
 
-    const [today, week] = await Promise.allSettled([api("/triage/today"), api("/triage/week")]);
+    const [today, week] = await Promise.allSettled([api("/triage/today"), api("/triage/weekly")]);
     document.querySelector("#w-today .widget-body").innerHTML =
-        today.status === "fulfilled" ? todayBody(today.value) : widgetError(today.reason);
+        today.status === "fulfilled" ? todayBody(flattenEmails(today.value)) : widgetError(today.reason);
     document.querySelector("#w-week .widget-body").innerHTML =
-        week.status === "fulfilled" ? weekBody(week.value) : widgetError(week.reason);
+        week.status === "fulfilled" ? weekBody(flattenEmails(week.value)) : widgetError(week.reason);
 }
 
 // ---------- detail view ----------
 
 async function renderDetail(id) {
     try {
-        const email = await api(`/triage/email/${id}`);
-        const key = catKey(email.category);
+        const email = await api(`/email/${id}`);
+        const key = catKey(email.correctedCategory ?? email.category);
         const radios = Object.entries(CATEGORIES).map(([k, c]) => `
             <label><input type="radio" name="category" value="${k}" ${k === key ? "checked" : ""}>
             ${escapeHtml(c.label)}</label>`).join("");
@@ -178,10 +182,10 @@ async function renderDetail(id) {
             const category = new FormData(e.target).get("category");
             const status = document.getElementById("feedback-status");
             try {
-                await api(`/triage/email/${email.id}/feedback`, {
+                await api(`/feed-back/${email.id}`, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({message: category}),
+                    body: JSON.stringify({category}),
                 });
                 status.textContent = "Saved.";
             } catch (err) {
@@ -236,9 +240,9 @@ const SAMPLE_EMAILS = [
 
 function demoApi(path) {
     if (path === "/triage/today") {
-        return Promise.resolve({category: null, emails: SAMPLE_EMAILS});
+        return Promise.resolve({statChips: [], categoryGroups: groupByCategory(SAMPLE_EMAILS)});
     }
-    if (path === "/triage/week") {
+    if (path === "/triage/weekly") {
         const counts = {NEEDS_REPLY: 9, FYI: 14, NEWSLETTER: 6, JUNK: 11};
         let id = 100;
         const emails = Object.entries(counts).flatMap(([cat, n]) =>
@@ -246,14 +250,14 @@ function demoApi(path) {
                 id: id++, sender: `${CATEGORIES[cat].label} sender`, subject: `${CATEGORIES[cat].label} sample #${i + 1}`,
                 receivedAt: "—", snippet: "Weekly sample", body: "", category: cat, reason: "", draft: null,
             })));
-        return Promise.resolve({category: null, emails});
+        return Promise.resolve(groupByCategory(emails));
     }
-    const emailMatch = path.match(/^\/triage\/email\/(\d+)/);
-    if (emailMatch && !path.endsWith("/feedback")) {
+    const emailMatch = path.match(/^\/email\/(\d+)/);
+    if (emailMatch) {
         const email = SAMPLE_EMAILS.find(e => e.id === Number(emailMatch[1]));
         return email ? Promise.resolve(email)
                      : Promise.reject(Object.assign(new Error("Not found"), {status: 404}));
     }
-    if (path.endsWith("/feedback")) return Promise.resolve(null);
+    if (/^\/feed-back\/\d+/.test(path)) return Promise.resolve(null);
     return Promise.reject(Object.assign(new Error("Not found"), {status: 404}));
 }

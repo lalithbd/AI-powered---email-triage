@@ -3,6 +3,7 @@ package org.galactic.service.impl;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePart;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import lombok.AllArgsConstructor;
@@ -85,6 +86,12 @@ public class EmailServiceImpl implements EmailService {
             }
         }
         log.info("fetchMails: fetched={} dupes={} failed={} listed={}", fetched, dupes, failed, summaries.size());
+    }
+
+    @Override
+    @Transactional
+    public void setStatus(Long id, EmailStatus emailStatus) {
+        Email.update("status = ?1 where id = ?2", emailStatus, id);
     }
 
     private Email toEmail(Message msg) {

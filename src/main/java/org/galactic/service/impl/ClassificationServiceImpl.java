@@ -1,11 +1,10 @@
 package org.galactic.service.impl;
 
-import com.google.api.client.util.Value;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.galactic.adapter.OllamaAdapter;
 import org.galactic.dto.ollama.TriageResult;
@@ -21,6 +20,7 @@ import org.galactic.service.ClassificationService;
 import org.galactic.service.EmailService;
 import org.galactic.util.Category;
 import org.galactic.util.Constant;
+import org.galactic.util.EmailStatus;
 
 import java.time.Instant;
 import java.time.Period;
@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @ApplicationScoped
 @RequiredArgsConstructor
 public class ClassificationServiceImpl implements ClassificationService {
@@ -101,12 +102,21 @@ public class ClassificationServiceImpl implements ClassificationService {
                 nextPage = false;
             }
             emails.forEach(email -> {
-                TriageResult triageResult = llmService.classify(email.getSender(),email.getSubject(),email.getReceivedAt().toString(), email.getBody(), email.getAttachmentCount());
-                Classification classification = Classification.builder()
-                        .email(email)
-                        .classifiedAt(Instant.now()).draft(triageResult.draft()).category(triageResult.category())
-                        .reason(triageResult.reason()).modelId(modelCode).promptVersion(promptVersion).build();
-                self.persist(classification);
+                try {
+                    TriageResult triageResult = llmService.classify(email.getSender(),email.getSubject(),email.getReceivedAt().toString(), email.getBody(), email.getAttachmentCount());
+                    Classification classification = Classification.builder()
+                            .email(email)
+                            .classifiedAt(Instant.now()).draft(triageResult.draft()).category(triageResult.category())
+                            .reason(triageResult.reason()).modelId(modelCode).promptVersion(promptVersion).build();
+                    self.persist(classification);
+                } catch (Exception e){
+                    log.error("Failed classify the email : {}", email.id);
+                    if(email.getFailedCount()> 2){
+                        emailService.setStatus(email.id, EmailStatus.FAILED);
+                        return;
+                    }
+                    emailService.setStatus(email.id, EmailStatus.RETRY);
+                }
             });
             page++;
         }
@@ -116,5 +126,6 @@ public class ClassificationServiceImpl implements ClassificationService {
     @Transactional
     public void persist(Classification classification){
         classificationRepository.persist(classification);
+        Email.update("status = ?1 where id = ?2", EmailStatus.PROCESSED, classification.getEmail().id);
     }
 }
