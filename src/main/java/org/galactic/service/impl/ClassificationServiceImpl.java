@@ -103,6 +103,7 @@ public class ClassificationServiceImpl implements ClassificationService {
             emails.forEach(email -> {
                 TriageResult triageResult = llmService.classify(email.getSender(),email.getSubject(),email.getReceivedAt().toString(), email.getBody(), email.getAttachmentCount());
                 Classification classification = Classification.builder()
+                        .email(email)
                         .classifiedAt(Instant.now()).draft(triageResult.draft()).category(triageResult.category())
                         .reason(triageResult.reason()).modelId(modelCode).promptVersion(promptVersion).build();
                 self.persist(classification);
