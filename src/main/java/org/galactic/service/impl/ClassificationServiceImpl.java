@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.Period;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -103,19 +104,20 @@ public class ClassificationServiceImpl implements ClassificationService {
             }
             emails.forEach(email -> {
                 try {
-                    TriageResult triageResult = llmService.classify(email.getSender(),email.getSubject(),email.getReceivedAt().toString(), email.getBody(), email.getAttachmentCount());
+                    TriageResult triageResult = llmService.classify(email.getSender(),email.getSubject(),Objects.toString(email.getReceivedAt(), ""), email.getBody(), email.getAttachmentCount());
+                    if (triageResult == null || triageResult.category() == null) {
+                        throw new IllegalStateException("model returned no usable category");
+                    }
+                    log.info("Received valid result for mail : {}, type : {} ", email.id, triageResult.category());
                     Classification classification = Classification.builder()
                             .email(email)
                             .classifiedAt(Instant.now()).draft(triageResult.draft()).category(triageResult.category())
                             .reason(triageResult.reason()).modelId(modelCode).promptVersion(promptVersion).build();
                     self.persist(classification);
                 } catch (Exception e){
-                    log.error("Failed classify the email : {}", email.id);
-                    if(email.getFailedCount()> 2){
-                        emailService.setStatus(email.id, EmailStatus.FAILED);
-                        return;
-                    }
-                    emailService.setStatus(email.id, EmailStatus.RETRY);
+                    log.error("Failed classify the email : {} ({})", email.id, e.getMessage());
+                    emailService.markFailed(email.id,
+                            email.getFailedCount() > 2 ? EmailStatus.FAILED : EmailStatus.RETRY);
                 }
             });
             page++;

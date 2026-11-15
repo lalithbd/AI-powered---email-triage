@@ -90,8 +90,8 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     @Transactional
-    public void setStatus(Long id, EmailStatus emailStatus) {
-        Email.update("status = ?1 where id = ?2", emailStatus, id);
+    public void markFailed(Long id, EmailStatus emailStatus) {
+        Email.update("status = ?1, failedCount = failedCount + 1 where id = ?2", emailStatus, id);
     }
 
     private Email toEmail(Message msg) {

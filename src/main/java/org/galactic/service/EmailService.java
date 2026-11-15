@@ -18,5 +18,5 @@ public interface EmailService {
 
     void fetchMails() throws IOException;
 
-    void setStatus(Long id, EmailStatus emailStatus);
+    void markFailed(Long id, EmailStatus emailStatus);
 }
