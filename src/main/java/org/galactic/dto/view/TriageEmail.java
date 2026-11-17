@@ -2,17 +2,16 @@ package org.galactic.dto.view;
 
 import org.galactic.model.Classification;
 import org.galactic.model.Email;
-import org.galactic.model.Feedback;
 import org.galactic.util.Category;
-import org.galactic.util.CommonUtils;
 
+import java.time.Instant;
 import java.util.List;
 
 
 public record TriageEmail(long id,
                           String sender,
                           String subject,
-                          String receivedAt,
+                          Instant receivedAt,
                           String snippet,
                           String body,
                           Category category,
@@ -25,7 +24,7 @@ public record TriageEmail(long id,
         Email e = c.getEmail();
         Category feedback = c.getFeedback() != null? c.getFeedback().getCorrectedCategory(): null;
         return new TriageEmail(e.id, e.getSender(), e.getSubject(),
-                CommonUtils.formatTime(e.getReceivedAt()), snippetOf(e.getBody()), e.getBody(),
+                e.getReceivedAt(), snippetOf(e.getBody()), e.getBody(),
                 c.getCategory(), feedback, c.getReason(), c.getDraft());
     }
 
@@ -33,7 +32,7 @@ public record TriageEmail(long id,
         Classification c = e.getClassification();
         Category feedback = c.getFeedback() != null? c.getFeedback().getCorrectedCategory(): null;
         return new TriageEmail(e.id, e.getSender(), e.getSubject(),
-                CommonUtils.formatTime(e.getReceivedAt()), snippetOf(e.getBody()), e.getBody(),
+                e.getReceivedAt(), snippetOf(e.getBody()), e.getBody(),
                 c.getCategory(), feedback, c.getReason(), c.getDraft());
     }
 

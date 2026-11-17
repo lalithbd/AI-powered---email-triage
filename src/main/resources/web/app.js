@@ -9,9 +9,10 @@
 //        body: { "category": "<category name>" }   (DTO is FeedbackCategory(Category category))
 //
 // <email> = TriageEmail record:
-//   { "id": 1, "sender": "...", "subject": "...", "receivedAt": "09:12",
+//   { "id": 1, "sender": "...", "subject": "...", "receivedAt": "<ISO instant>",
 //     "snippet": "...", "body": "...", "category": "NEEDS_REPLY",
 //     "reason": "...", "draft": "..." | null }
+//   receivedAt is rendered in the viewer's local timezone by fmtAt().
 //
 // `category` may serialize as the enum name ("NEEDS_REPLY") or as an object
 // ({ "name": ..., "label": ... }) depending on Jackson config — both handled.
@@ -55,9 +56,24 @@ function groupByCategory(emails) {
     return CAT_ORDER.filter(k => map.has(k)).map(k => ({category: k, emails: map.get(k)}));
 }
 
+function fmtAt(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return String(iso ?? "");
+    const today = new Date().toDateString() === d.toDateString();
+    return today ? d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})
+                 : d.toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"});
+}
+
+function csrfToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
+    return m ? m[1] : "";
+}
+
 async function api(path, options = {}) {
     if (DEMO) return demoApi(path, options);
-    const res = await fetch(path, options);
+    const headers = {...(options.headers ?? {})};
+    if (options.method && options.method !== "GET") headers["csrf-token"] ??= csrfToken();
+    const res = await fetch(path, {...options, headers});
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), {status: res.status});
     const text = await res.text();
     return text ? JSON.parse(text) : null;
@@ -67,14 +83,14 @@ async function api(path, options = {}) {
 
 function emailCard(email) {
     const key = catKey(email.category);
-    return `<a class="email card" href="#/emails/${email.id}">
+    return `<a class="email card" data-cat="${key}" href="#/emails/${email.id}">
         <div class="top">
             <div>
                 <div class="subject">${escapeHtml(email.subject)}</div>
                 <div class="from muted">${escapeHtml(email.sender)}</div>
                 <div class="snippet muted">${escapeHtml(email.snippet)}</div>
             </div>
-            <div class="muted">${escapeHtml(email.receivedAt)}</div>
+            <div class="muted">${escapeHtml(fmtAt(email.receivedAt))}</div>
         </div>
         ${email.reason ? `<div class="reason">${escapeHtml(email.reason)}</div>` : ""}
         <span class="badge badge-${key}">${escapeHtml(catLabel(email.category))}</span>
@@ -89,12 +105,12 @@ function flattenEmails(data) {
 function todayBody(emails) {
     const groups = groupByCategory(emails);
     if (!groups.length) return `<div class="card empty">No emails triaged yet today.</div>`;
-    const stats = groups.map(g => `<div class="stat">
+    const stats = groups.map(g => `<div class="stat" data-filter-cat="${g.category}" title="Filter by ${escapeHtml(catLabel(g.category))}">
         <div class="n">${g.emails.length}</div>
         <span class="badge badge-${g.category}">${escapeHtml(catLabel(g.category))}</span>
     </div>`).join("");
     const list = groups.map(g => `
-        <h2 class="group">${escapeHtml(catLabel(g.category))} &middot; ${g.emails.length}</h2>
+        <h2 class="group" data-cat="${g.category}">${escapeHtml(catLabel(g.category))} &middot; ${g.emails.length}</h2>
         ${g.emails.map(emailCard).join("")}`).join("");
     return `<div class="stats">${stats}</div>${list}`;
 }
@@ -106,7 +122,7 @@ function weekBody(emails) {
     const max = Math.max(...groups.map(g => g.emails.length));
     const bars = groups.map(g => {
         const pct = Math.max(4, Math.round((g.emails.length / max) * 100));
-        return `<div class="week-row">
+        return `<div class="week-row" data-filter-cat="${g.category}" title="Filter by ${escapeHtml(catLabel(g.category))}">
             <span class="badge badge-${g.category}">${escapeHtml(catLabel(g.category))}</span>
             <div class="week-bar"><span class="week-fill fill-${g.category}" style="width:${pct}%"></span></div>
             <span class="week-count muted">${g.emails.length}</span>
@@ -116,6 +132,20 @@ function weekBody(emails) {
         ${bars}
         <h2 class="group">Emails</h2>
         ${(emails ?? []).map(emailCard).join("")}`;
+}
+
+function bindCategoryFilters(widgetEl) {
+    widgetEl.querySelectorAll("[data-filter-cat]").forEach(chip => {
+        chip.addEventListener("click", () => {
+            const cat = widgetEl.dataset.filter === chip.dataset.filterCat ? "" : chip.dataset.filterCat;
+            widgetEl.dataset.filter = cat;
+            widgetEl.querySelectorAll("[data-cat]").forEach(el => {
+                el.style.display = (!cat || el.dataset.cat === cat) ? "" : "none";
+            });
+            widgetEl.querySelectorAll("[data-filter-cat]").forEach(c =>
+                c.classList.toggle("active", c.dataset.filterCat === cat));
+        });
+    });
 }
 
 function widgetError(err) {
@@ -139,6 +169,8 @@ async function renderIndex() {
         today.status === "fulfilled" ? todayBody(flattenEmails(today.value)) : widgetError(today.reason);
     document.querySelector("#w-week .widget-body").innerHTML =
         week.status === "fulfilled" ? weekBody(flattenEmails(week.value)) : widgetError(week.reason);
+    bindCategoryFilters(document.getElementById("w-today"));
+    bindCategoryFilters(document.getElementById("w-week"));
 }
 
 // ---------- detail view ----------
@@ -158,7 +190,7 @@ async function renderDetail(id) {
                     <span class="badge badge-${key}">${escapeHtml(catLabel(email.category))}</span>
                     <span class="muted">${escapeHtml(email.sender)}</span>
                     <span class="muted">&middot;</span>
-                    <span class="muted">${escapeHtml(email.receivedAt)}</span>
+                    <span class="muted">${escapeHtml(fmtAt(email.receivedAt))}</span>
                 </div>
                 <div class="subject">${escapeHtml(email.subject)}</div>
                 <div class="body">${escapeHtml(email.body)}</div>

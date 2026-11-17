@@ -68,7 +68,13 @@ main { max-width: 1200px; margin: 1.5rem auto; padding: 0 1rem; }
   align-items: center;
   gap: 0.6rem;
   margin-bottom: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 8px;
+  padding: 0.25rem 0.4rem;
+  margin-left: -0.4rem;
 
+  &.active { background: #f1f5f9; outline: 1px solid #cbd5e1; }
   .badge { min-width: 92px; text-align: center; }
   .week-count { min-width: 2.2rem; text-align: right; font-variant-numeric: tabular-nums; }
 }
@@ -137,7 +143,10 @@ button {
   border-radius: 10px;
   padding: 0.6rem 0.9rem;
   min-width: 118px;
+  cursor: pointer;
+  user-select: none;
 
+  &.active { border-color: #64748b; box-shadow: 0 0 0 1px #64748b; }
   .n { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; }
 }
 
