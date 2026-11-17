@@ -72,7 +72,7 @@ function csrfToken() {
 async function api(path, options = {}) {
     if (DEMO) return demoApi(path, options);
     const headers = {...(options.headers ?? {})};
-    if (options.method && options.method !== "GET") headers["csrf-token"] ??= csrfToken();
+    if (options.method && options.method !== "GET") headers["X-CSRF-TOKEN"] ??= csrfToken();
     const res = await fetch(path, {...options, headers});
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), {status: res.status});
     const text = await res.text();
