@@ -1,5 +1,6 @@
 package org.galactic.dto.view;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import org.galactic.model.Classification;
 import org.galactic.model.Email;
 import org.galactic.util.Category;
@@ -8,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 
 
+@RegisterForReflection
 public record TriageEmail(long id,
                           String sender,
                           String subject,
